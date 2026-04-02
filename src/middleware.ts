@@ -4,12 +4,14 @@ import type { NextRequest } from "next/server";
 export function middleware(_request: NextRequest) {
   const response = NextResponse.next();
 
-  // CSP headers
+  const isDev = process.env.NODE_ENV === "development";
+
+  // CSP headers — unsafe-eval only in dev (webpack HMR requires it)
   response.headers.set(
     "Content-Security-Policy",
     [
       `default-src 'self'`,
-      `script-src 'self' 'unsafe-inline' 'unsafe-eval'`,
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
       `style-src 'self' 'unsafe-inline'`,
       `img-src 'self' data: blob:`,
       `font-src 'self' data:`,
