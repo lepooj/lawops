@@ -334,9 +334,9 @@ function AnalysisPdfDocument({
         {/* 2. Issues */}
         <Sec num={n()} title="Issues to Decide">
           {output.issues.map((issue) => (
-            <View key={issue.id} style={s.issueRow} wrap={false}>
-              <T style={s.issueText}>{issue.issue}</T>
-              <View style={{ flexDirection: "row", gap: 3 }}>
+            <View key={issue.id} style={s.card} wrap={false}>
+              <T style={s.body}>{issue.issue}</T>
+              <View style={{ ...s.tagRow, marginTop: 3 }}>
                 <Text style={s.tag}>{issue.importance}</Text>
                 <Text style={s.tag}>
                   {issue.status.replace("_", " ")}
@@ -353,14 +353,14 @@ function AnalysisPdfDocument({
         <Sec num={n()} title="Governing Law">
           {output.governing_law.map((gl, i) => (
             <View key={i} style={s.card} wrap={false}>
-              <View style={s.cardHeader}>
-                <T style={s.cardTitle}>{gl.topic}</T>
+              <T style={s.cardTitle}>{gl.topic}</T>
+              <View style={{ ...s.tagRow, marginTop: 2, marginBottom: 3 }}>
                 <VBadge status={gl.verification_status} />
+                <Text style={s.tag}>
+                  {gl.source_type.replace("_", " ")}
+                </Text>
               </View>
               <T style={s.cardBody}>{gl.rule_statement}</T>
-              <Text style={s.cardMeta}>
-                Source: {gl.source_type.replace("_", " ")}
-              </Text>
             </View>
           ))}
         </Sec>
@@ -580,20 +580,13 @@ function Bullets({ items }: { items: string[] }) {
 function AuthCard({ authority }: { authority: Authority }) {
   return (
     <View style={s.card} wrap={false}>
-      <View style={s.cardHeader}>
-        <View style={{ flex: 1, paddingRight: 6 }}>
-          <T style={s.cardTitle}>{authority.title}</T>
-          <Text style={s.cardCitation}>
-            {cleanText(authority.citation)}
-          </Text>
-        </View>
+      {/* Flat vertical layout — no nested flex rows that cause overlap in react-pdf */}
+      <T style={s.cardTitle}>{authority.title}</T>
+      <Text style={s.cardCitation}>{cleanText(authority.citation)}</Text>
+      <View style={{ ...s.tagRow, marginTop: 4, marginBottom: 3 }}>
         <VBadge status={authority.verification_status} />
-      </View>
-      <View style={{ ...s.tagRow, marginTop: 3 }}>
         {authority.court_or_source && (
-          <Text style={s.tag}>
-            {cleanText(authority.court_or_source)}
-          </Text>
+          <Text style={s.tag}>{cleanText(authority.court_or_source)}</Text>
         )}
         {authority.year && <Text style={s.tag}>{authority.year}</Text>}
         <Text style={s.tag}>{authority.weight}</Text>
