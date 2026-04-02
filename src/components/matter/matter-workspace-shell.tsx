@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -51,21 +51,30 @@ export function MatterWorkspaceShell({
   const activeTab =
     TABS.find((t) => pathname.endsWith(`/${t.segment}`))?.key ?? "intake";
 
+  // Clear error when navigating between tabs
+  useEffect(() => {
+    setRunError("");
+  }, [pathname]);
+
   async function handleRunAnalysis() {
     setRunError("");
     setRunning(true);
 
-    const result = await runAnalysis(matterId, selectedMode);
+    try {
+      const result = await runAnalysis(matterId, selectedMode);
 
-    setRunning(false);
+      if ("error" in result) {
+        setRunError(result.error);
+        return;
+      }
 
-    if ("error" in result) {
-      setRunError(result.error);
-      return;
+      router.push(`${basePath}/analysis`);
+      router.refresh();
+    } catch {
+      setRunError("Analysis request failed. Please try again.");
+    } finally {
+      setRunning(false);
     }
-
-    router.push(`${basePath}/analysis`);
-    router.refresh();
   }
 
   return (

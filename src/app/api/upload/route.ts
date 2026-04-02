@@ -9,6 +9,7 @@ import {
   isMagicByteConsistent,
   parseDocumentType,
 } from "@/server/lib/upload-validation";
+import { extractDocument } from "@/server/lib/document-extraction/extract-document";
 
 export async function POST(request: NextRequest) {
   // Auth check
@@ -93,9 +94,58 @@ export async function POST(request: NextRequest) {
         mimeType: file.type,
         fileSize: file.size,
         documentType: parseDocumentType(documentType),
-        extractionStatus: "PENDING",
+        extractionStatus: "PROCESSING",
         includeInAnalysis: true,
       },
+    });
+
+    savedStoragePath = null; // DB record created — no cleanup needed
+
+    // Run extraction immediately while buffer is still in memory.
+    // On serverless (Vercel), the filesystem is ephemeral, so the file
+    // saved to disk may not be available for a later extraction request.
+    try {
+      const extraction = await extractDocument(buffer, file.type);
+
+      if (extraction.ok) {
+        await db.document.update({
+          where: { id: document.id },
+          data: {
+            extractionStatus: "COMPLETE",
+            extractionMethod: extraction.method,
+            extractedText: extraction.text || null,
+            pageCount: extraction.pageCount,
+            ocrConfidence: extraction.ocrConfidence,
+            extractionError: null,
+          },
+        });
+      } else {
+        await db.document.update({
+          where: { id: document.id },
+          data: {
+            extractionStatus: "FAILED",
+            extractionMethod: extraction.method,
+            extractionError: extraction.error,
+          },
+        });
+      }
+    } catch (extractionErr) {
+      // Extraction failure is non-fatal — the document is still uploaded
+      await db.document.update({
+        where: { id: document.id },
+        data: {
+          extractionStatus: "FAILED",
+          extractionError:
+            extractionErr instanceof Error
+              ? extractionErr.message
+              : "Extraction failed",
+        },
+      });
+    }
+
+    // Return the updated document
+    const updatedDoc = await db.document.findUnique({
+      where: { id: document.id },
       select: {
         id: true,
         originalFilename: true,
@@ -103,13 +153,15 @@ export async function POST(request: NextRequest) {
         fileSize: true,
         documentType: true,
         extractionStatus: true,
+        extractionMethod: true,
+        extractionError: true,
+        ocrConfidence: true,
         includeInAnalysis: true,
         uploadedAt: true,
       },
     });
 
-    savedStoragePath = null; // DB record created — no cleanup needed
-    return NextResponse.json({ document }, { status: 201 });
+    return NextResponse.json({ document: updatedDoc }, { status: 201 });
   } catch (e) {
     // If we saved a file but DB insert failed, clean up the orphaned file
     if (savedStoragePath) {

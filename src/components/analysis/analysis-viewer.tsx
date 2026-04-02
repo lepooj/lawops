@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -89,27 +90,7 @@ export function AnalysisViewer({
 
         {/* Export buttons */}
         <div className="mt-6 space-y-2">
-          <Button
-            size="sm"
-            variant="primary"
-            className="w-full"
-            onClick={async () => {
-              const { generateAnalysisPdf } = await import("./analysis-pdf");
-              const blob = await generateAnalysisPdf(
-                output,
-                stats,
-                runMeta.completedAt
-              );
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `analysis-${output.mode}-${new Date().toISOString().slice(0, 10)}.pdf`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-          >
-            Export PDF
-          </Button>
+          <ExportPdfButton output={output} stats={stats} completedAt={runMeta.completedAt} />
           <Button
             size="sm"
             variant="secondary"
@@ -155,10 +136,18 @@ export function AnalysisViewer({
           <ConfidenceBadge level={output.confidence.overall} />
         </div>
 
-        {/* Warnings */}
-        {warnings.length > 0 && (
+        {/* Warnings — only show user-meaningful ones, not technical validator noise */}
+        {warnings.filter(w =>
+          w.code === "NO_AUTHORITIES_CITED" ||
+          w.code === "ALL_AUTHORITIES_UNVERIFIED" ||
+          w.code === "GOVERNING_LAW_ALL_UNVERIFIED"
+        ).length > 0 && (
           <div className="mb-4 rounded border border-amber-900/40 bg-amber-950/20 px-3 py-2 print:border-amber-300 print:bg-amber-50">
-            {warnings.map((w, i) => (
+            {warnings.filter(w =>
+              w.code === "NO_AUTHORITIES_CITED" ||
+              w.code === "ALL_AUTHORITIES_UNVERIFIED" ||
+              w.code === "GOVERNING_LAW_ALL_UNVERIFIED"
+            ).map((w, i) => (
               <p key={i} className="text-xs text-amber-400 print:text-amber-700">
                 {w.message}
               </p>
@@ -379,6 +368,58 @@ export function AnalysisViewer({
         </div>
       </div>
     </div>
+  );
+}
+
+// === Export PDF button with error handling ===
+
+function ExportPdfButton({
+  output,
+  stats,
+  completedAt,
+}: {
+  output: CopilotOutput;
+  stats: OutputStats;
+  completedAt: string | null;
+}) {
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+
+  async function handleExport() {
+    setExporting(true);
+    setExportError("");
+
+    try {
+      const { generateAnalysisPdf } = await import("./analysis-pdf");
+      const blob = await generateAnalysisPdf(output, stats, completedAt);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `analysis-${output.mode}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError("PDF generation failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="primary"
+        className="w-full"
+        onClick={handleExport}
+        disabled={exporting}
+      >
+        {exporting ? "Generating…" : "Export PDF"}
+      </Button>
+      {exportError && (
+        <p className="text-xs text-red-400">{exportError}</p>
+      )}
+    </>
   );
 }
 
