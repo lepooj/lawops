@@ -1,0 +1,230 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// === ENUMS ===
+
+enum MatterType {
+  LITIGATION
+  REGULATORY
+  ADVISORY
+  OTHER
+}
+
+enum MatterStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum DocumentType {
+  PLEADING
+  EVIDENCE
+  CASE_LAW
+  STATUTE
+  CORRESPONDENCE
+  OTHER
+}
+
+enum ExtractionMethod {
+  PDF_PARSE
+  DOCX_PARSE
+  PLAIN_TEXT
+  OCR
+}
+
+enum ExtractionStatus {
+  PENDING
+  PROCESSING
+  COMPLETE
+  FAILED
+}
+
+enum AnalysisStatus {
+  RUNNING
+  COMPLETE
+  FAILED
+}
+
+enum ReviewStatus {
+  UNREVIEWED
+  REVIEWED
+  FLAGGED
+}
+
+enum CitationSource {
+  AI_GENERATED
+  USER_PROVIDED
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  VERIFIED
+  FLAGGED
+}
+
+// === MODELS ===
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+
+  matters      Matter[]
+  documents    Document[]
+  analysisRuns AnalysisRun[]
+}
+
+model Matter {
+  id         String       @id @default(uuid())
+  userId     String
+  title      String
+  matterType MatterType
+  status     MatterStatus @default(DRAFT)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  archivedAt DateTime?
+
+  user         User          @relation(fields: [userId], references: [id])
+  intake       MatterIntake?
+  documents    Document[]
+  analysisRuns AnalysisRun[]
+
+  @@index([userId, status])
+}
+
+model MatterIntake {
+  id       String @id @default(uuid())
+  matterId String @unique
+
+  // Section 1: Jurisdiction (required)
+  province         String?
+  courtLevel       String?
+  jurisdictionType String? // "federal" | "provincial"
+  areaOfLaw        String?
+
+  // Section 2: Facts & Parties (required)
+  facts   String? @db.Text
+  parties Json? // [{ name: string, role: string }]
+
+  // Section 3: Legal Objective (required)
+  desiredOutcome String? @db.Text
+  constraints    String? @db.Text
+
+  // Section 4: Procedural History (optional)
+  proceduralStage String?
+  priorDecisions  String? @db.Text
+  keyDates        Json? // [{ date: string, event: string }]
+
+  // Section 5: Known Authorities (optional)
+  supportingAuthorities Json? // [{ caseName, citation, relevance }]
+  opposingArguments     String? @db.Text
+  opposingAuthorities   Json? // [{ caseName, citation, relevance }]
+
+  updatedAt DateTime @updatedAt
+
+  matter Matter @relation(fields: [matterId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+  id               String           @id @default(uuid())
+  matterId         String
+  userId           String
+  originalFilename String
+  storagePath      String
+  mimeType         String
+  fileSize         Int
+  documentType     DocumentType     @default(OTHER)
+
+  extractionMethod ExtractionMethod?
+  extractionStatus ExtractionStatus @default(PENDING)
+  extractedText    String?          @db.Text
+  extractionError  String?
+  ocrConfidence    Float?
+  pageCount        Int?
+
+  includeInAnalysis Boolean @default(true)
+
+  uploadedAt DateTime @default(now())
+
+  matter Matter @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([matterId])
+}
+
+model AnalysisRun {
+  id        String         @id @default(uuid())
+  matterId  String
+  userId    String
+  runNumber Int
+  status    AnalysisStatus
+
+  // Snapshot: frozen state of inputs at run time
+  inputSnapshot    Json
+  documentExcerpts Json // [{ docId, filename, type, excerpt, method }]
+
+  // Raw AI response
+  rawOutput String? @db.Text
+
+  // AI metadata
+  promptVersion String
+  model         String
+  inputTokens   Int?
+  outputTokens  Int?
+  latencyMs     Int?
+  errorMessage  String?
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  matter   Matter            @relation(fields: [matterId], references: [id], onDelete: Cascade)
+  user     User              @relation(fields: [userId], references: [id])
+  sections AnalysisSection[]
+  citations Citation[]
+
+  @@unique([matterId, runNumber])
+  @@index([matterId])
+}
+
+model AnalysisSection {
+  id           String       @id @default(uuid())
+  runId        String
+  sectionKey   String
+  sectionOrder Int
+  title        String
+  summary      String       @db.Text
+  content      String       @db.Text
+  reviewStatus ReviewStatus @default(UNREVIEWED)
+
+  run       AnalysisRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  citations Citation[]
+
+  @@index([runId])
+}
+
+model Citation {
+  id                 String             @id @default(uuid())
+  runId              String
+  sectionId          String
+  citationText       String
+  caseName           String?
+  year               Int?
+  court              String?
+  propositionUsedFor String?            @db.Text
+  source             CitationSource     @default(AI_GENERATED)
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+
+  run     AnalysisRun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  section AnalysisSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([sectionId])
+}
