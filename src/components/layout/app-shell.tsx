@@ -40,6 +40,17 @@ export function AppShell({ user, children }: AppShellProps) {
           >
             Matters
           </Link>
+          <Link
+            href="/help"
+            className={cn(
+              "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              pathname === "/help"
+                ? "bg-zinc-800/80 text-zinc-100"
+                : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+            )}
+          >
+            Help
+          </Link>
         </nav>
 
         {/* Footer */}

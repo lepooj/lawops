@@ -400,7 +400,6 @@ function ExportPdfButton({
       URL.revokeObjectURL(url);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      // eslint-disable-next-line no-console
       console.error("[LawOps] PDF export failed:", err);
       setExportError(`PDF generation failed: ${message}`);
     } finally {

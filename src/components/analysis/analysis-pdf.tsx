@@ -130,7 +130,7 @@ const s = StyleSheet.create({
     lineHeight: 1.5,
     color: "#27272a",
   },
-  // Cards
+  // Cards — pure vertical stack, no flex-row (react-pdf flex-row causes overlap)
   card: {
     borderWidth: 0.5,
     borderColor: "#d4d4d8",
@@ -138,60 +138,26 @@ const s = StyleSheet.create({
     padding: 8,
     marginBottom: 6,
   },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 3,
-  },
   cardTitle: {
     fontSize: 9.5,
     fontWeight: "bold",
     color: "#09090b",
-    flex: 1,
-    paddingRight: 6,
+    marginBottom: 2,
   },
   cardCitation: {
     fontSize: 8.5,
     color: "#52525b",
-    marginTop: 1,
+    marginBottom: 2,
   },
   cardMeta: {
     fontSize: 7.5,
     color: "#71717a",
-    marginTop: 3,
+    marginBottom: 3,
   },
   cardBody: {
     fontSize: 9,
     lineHeight: 1.45,
     color: "#3f3f46",
-    marginTop: 3,
-  },
-  // Badges
-  badge: {
-    fontSize: 6.5,
-    fontWeight: "bold",
-    paddingHorizontal: 4,
-    paddingVertical: 1.5,
-    borderRadius: 2,
-    color: "#ffffff",
-  },
-  badgeVerified: { backgroundColor: "#059669" },
-  badgeProvisional: { backgroundColor: "#d97706" },
-  badgeUnverified: { backgroundColor: "#dc2626" },
-  // Tags
-  tag: {
-    fontSize: 7,
-    paddingHorizontal: 4,
-    paddingVertical: 1.5,
-    borderRadius: 2,
-    backgroundColor: "#f4f4f5",
-    color: "#52525b",
-  },
-  tagRow: {
-    flexDirection: "row",
-    gap: 3,
-    flexWrap: "wrap",
     marginTop: 2,
   },
   // Issues
@@ -336,12 +302,9 @@ function AnalysisPdfDocument({
           {output.issues.map((issue) => (
             <View key={issue.id} style={s.card} wrap={false}>
               <T style={s.body}>{issue.issue}</T>
-              <View style={{ ...s.tagRow, marginTop: 3 }}>
-                <Text style={s.tag}>{issue.importance}</Text>
-                <Text style={s.tag}>
-                  {issue.status.replace("_", " ")}
-                </Text>
-              </View>
+              <Text style={s.cardMeta}>
+                {cleanText(`${issue.importance} | ${issue.status.replace("_", " ")}`)}
+              </Text>
             </View>
           ))}
           {output.issues.length === 0 && (
@@ -354,12 +317,9 @@ function AnalysisPdfDocument({
           {output.governing_law.map((gl, i) => (
             <View key={i} style={s.card} wrap={false}>
               <T style={s.cardTitle}>{gl.topic}</T>
-              <View style={{ ...s.tagRow, marginTop: 2, marginBottom: 3 }}>
-                <VBadge status={gl.verification_status} />
-                <Text style={s.tag}>
-                  {gl.source_type.replace("_", " ")}
-                </Text>
-              </View>
+              <Text style={s.cardMeta}>
+                {cleanText(`[${gl.verification_status.toUpperCase()}] ${gl.source_type.replace("_", " ")}`)}
+              </Text>
               <T style={s.cardBody}>{gl.rule_statement}</T>
             </View>
           ))}
@@ -368,23 +328,13 @@ function AnalysisPdfDocument({
         {/* 4. Authorities */}
         <Sec num={n()} title={`Authorities (${stats.totalAuthorities} cited)`}>
           {stats.totalAuthorities > 0 && (
-            <View style={{ ...s.tagRow, marginBottom: 6 }}>
-              {stats.verifiedAuthorities > 0 && (
-                <Text style={{ ...s.badge, ...s.badgeVerified }}>
-                  {stats.verifiedAuthorities} verified
-                </Text>
-              )}
-              {stats.provisionalAuthorities > 0 && (
-                <Text style={{ ...s.badge, ...s.badgeProvisional }}>
-                  {stats.provisionalAuthorities} provisional
-                </Text>
-              )}
-              {stats.unverifiedAuthorities > 0 && (
-                <Text style={{ ...s.badge, ...s.badgeUnverified }}>
-                  {stats.unverifiedAuthorities} unverified
-                </Text>
-              )}
-            </View>
+            <Text style={s.cardMeta}>
+              {[
+                stats.verifiedAuthorities > 0 && `${stats.verifiedAuthorities} verified`,
+                stats.provisionalAuthorities > 0 && `${stats.provisionalAuthorities} provisional`,
+                stats.unverifiedAuthorities > 0 && `${stats.unverifiedAuthorities} unverified`,
+              ].filter(Boolean).join(" | ")}
+            </Text>
           )}
           {output.authorities.map((auth) => (
             <AuthCard key={auth.id} authority={auth} />
@@ -578,54 +528,31 @@ function Bullets({ items }: { items: string[] }) {
 }
 
 function AuthCard({ authority }: { authority: Authority }) {
+  const meta = [
+    `[${authority.verification_status.toUpperCase()}]`,
+    authority.court_or_source,
+    authority.year,
+    authority.weight,
+    authority.treatment.replace("_", " "),
+  ].filter(Boolean).join(" | ");
+
   return (
     <View style={s.card} wrap={false}>
-      {/* Flat vertical layout — no nested flex rows that cause overlap in react-pdf */}
       <T style={s.cardTitle}>{authority.title}</T>
       <Text style={s.cardCitation}>{cleanText(authority.citation)}</Text>
-      <View style={{ ...s.tagRow, marginTop: 4, marginBottom: 3 }}>
-        <VBadge status={authority.verification_status} />
-        {authority.court_or_source && (
-          <Text style={s.tag}>{cleanText(authority.court_or_source)}</Text>
-        )}
-        {authority.year && <Text style={s.tag}>{authority.year}</Text>}
-        <Text style={s.tag}>{authority.weight}</Text>
-        <Text style={s.tag}>{authority.treatment.replace("_", " ")}</Text>
-      </View>
+      <Text style={s.cardMeta}>{cleanText(meta)}</Text>
       <T style={s.cardBody}>{authority.relevance}</T>
       {authority.quoted_text && (
-        <View
-          style={{
-            marginTop: 3,
-            paddingLeft: 6,
-            borderLeftWidth: 1.5,
-            borderLeftColor: "#d4d4d8",
-          }}
-        >
-          <Text style={{ ...s.bodySmall, fontStyle: "italic" }}>
-            {cleanText(
-              `"${authority.quoted_text}"${authority.pinpoint ? ` at ${authority.pinpoint}` : ""}`
-            )}
-          </Text>
-        </View>
+        <Text style={{ ...s.bodySmall, fontStyle: "italic", marginTop: 3, paddingLeft: 6 }}>
+          {cleanText(
+            `"${authority.quoted_text}"${authority.pinpoint ? ` at ${authority.pinpoint}` : ""}`
+          )}
+        </Text>
       )}
     </View>
   );
 }
 
-function VBadge({
-  status,
-}: {
-  status: "verified" | "provisional" | "unverified";
-}) {
-  const bg =
-    status === "verified"
-      ? s.badgeVerified
-      : status === "provisional"
-        ? s.badgeProvisional
-        : s.badgeUnverified;
-  return <Text style={{ ...s.badge, ...bg }}>{status}</Text>;
-}
 
 // === Export ===
 
