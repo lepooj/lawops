@@ -12,22 +12,16 @@ import type { CopilotOutput, Authority } from "@/lib/ai/output-schema";
 import type { OutputStats } from "@/lib/ai/output-validator";
 
 /**
- * Normalize text to prevent PDF text-layer corruption.
- *
- * @react-pdf/renderer's built-in fonts handle fi/fl/ffi ligatures poorly —
- * they encode as single glyphs that break copy-paste and search.
- * Inserting a zero-width non-joiner between ligature-forming pairs
- * prevents the PDF renderer from merging them into ligature glyphs.
+ * Clean text for PDF rendering.
+ * Strips control characters and soft hyphens that cause rendering artifacts.
  */
-function normalizeText(text: string): string {
+function cleanText(text: string): string {
   if (!text) return "";
-  // Insert ZWNJ (U+200C) between common ligature pairs to prevent ligature formation
   return text
-    .replace(/ffi/g, "f\u200Cfi")
-    .replace(/ffl/g, "f\u200Cfl")
-    .replace(/fi/g, "f\u200Ci")
-    .replace(/fl/g, "f\u200Cl")
-    .replace(/\u00AD/g, ""); // Remove soft hyphens
+    .replace(/\u00AD/g, "")   // soft hyphens
+    .replace(/\u200C/g, "")   // ZWNJ (from previous cleanText — clean up)
+    .replace(/\u200B/g, "")   // zero-width space
+    .replace(/\uFEFF/g, "");  // BOM
 }
 
 // === Styles ===
@@ -283,7 +277,7 @@ function AnalysisPdfDocument({
 
   return (
     <Document
-      title={normalizeText(`Legal Analysis - ${output.matter_summary.task}`)}
+      title={cleanText(`Legal Analysis - ${output.matter_summary.task}`)}
       author="LawOps"
       subject={`${output.mode} analysis`}
     >
@@ -291,7 +285,7 @@ function AnalysisPdfDocument({
         {/* Fixed footer on every page — lives in the reserved bottom padding */}
         <View style={s.pageFooter} fixed>
           <Text style={s.footerText}>
-            {normalizeText("LawOps - AI-Assisted Draft")}
+            {cleanText("LawOps - AI-Assisted Draft")}
           </Text>
           <Text
             style={s.footerText}
@@ -304,21 +298,21 @@ function AnalysisPdfDocument({
         {/* Header */}
         <View style={s.headerBlock}>
           <Text style={s.headerTitle}>
-            {normalizeText(output.matter_summary.task)}
+            {cleanText(output.matter_summary.task)}
           </Text>
           <Text style={s.headerMeta}>
-            {normalizeText(
+            {cleanText(
               `${output.matter_summary.jurisdiction}  |  ${output.matter_summary.forum}`
             )}
           </Text>
           <Text style={s.headerMeta}>
-            {normalizeText(
+            {cleanText(
               `${output.matter_summary.area_of_law.join(", ")}  |  ${output.mode.replace("_", " ")} analysis`
             )}
           </Text>
           {completedAt && (
             <Text style={s.headerMeta}>
-              {normalizeText(`Generated ${completedAt}`)}
+              {cleanText(`Generated ${completedAt}`)}
             </Text>
           )}
           <Text style={s.headerWatermark}>
@@ -330,7 +324,7 @@ function AnalysisPdfDocument({
         <Sec num={n()} title="Matter Summary">
           <T style={s.body}>{output.matter_summary.summary}</T>
           <T style={s.bodySmall}>
-            {normalizeText(
+            {cleanText(
               `Requested outcome: ${output.matter_summary.requested_outcome}`
             )}
           </T>
@@ -447,7 +441,7 @@ function AnalysisPdfDocument({
         {/* 11. Confidence */}
         <Sec num={n()} title="Confidence Assessment">
           <Text style={s.confidenceLabel}>
-            {normalizeText(`Overall confidence: ${output.confidence.overall}`)}
+            {cleanText(`Overall confidence: ${output.confidence.overall}`)}
           </Text>
           <T style={s.confidenceReason}>{output.confidence.reason}</T>
           {output.confidence.depends_on.length > 0 && (
@@ -478,7 +472,7 @@ function AnalysisPdfDocument({
               <Text
                 style={{ ...s.bodySmall, color: "#b45309", marginTop: 3 }}
               >
-                {normalizeText(
+                {cleanText(
                   `Contains ${output.verification.unverified_point_count} unverified point${output.verification.unverified_point_count !== 1 ? "s" : ""}. All authorities should be independently verified.`
                 )}
               </Text>
@@ -495,7 +489,7 @@ function AnalysisPdfDocument({
         {output.draft_output && (
           <Sec
             num={n()}
-            title={normalizeText(
+            title={cleanText(
               output.draft_output.title || "Draft Output"
             )}
           >
@@ -503,7 +497,7 @@ function AnalysisPdfDocument({
             {output.draft_output.sections?.map((sec, i) => (
               <View key={i} style={{ marginTop: 8 }}>
                 <Text style={s.subsectionTitle}>
-                  {normalizeText(sec.heading)}
+                  {cleanText(sec.heading)}
                 </Text>
                 <T style={s.body}>{sec.content}</T>
               </View>
@@ -514,10 +508,10 @@ function AnalysisPdfDocument({
         {/* Disclaimer */}
         <View style={s.disclaimerBlock} wrap={false}>
           <Text style={s.disclaimerText}>
-            {normalizeText(output.disclaimer)}
+            {cleanText(output.disclaimer)}
           </Text>
           <Text style={{ ...s.disclaimerText, marginTop: 5 }}>
-            {normalizeText(
+            {cleanText(
               "This document was generated by LawOps, an AI-assisted legal analysis tool. " +
                 "All authorities, legal propositions, and strategic recommendations require " +
                 "independent verification by a qualified legal professional before any reliance. " +
@@ -542,7 +536,7 @@ function T({
   style?: Style | Style[];
   children: string;
 }) {
-  return <Text style={style}>{normalizeText(children)}</Text>;
+  return <Text style={style}>{cleanText(children)}</Text>;
 }
 
 /** Section wrapper. Heading kept with first child via minPresenceAhead. */
@@ -559,7 +553,7 @@ function Sec({
     <View style={s.sectionWrap}>
       <View minPresenceAhead={40}>
         <Text style={s.sectionLabel}>Section {num}</Text>
-        <Text style={s.sectionTitle}>{normalizeText(title)}</Text>
+        <Text style={s.sectionTitle}>{cleanText(title)}</Text>
       </View>
       {children}
     </View>
@@ -589,7 +583,7 @@ function AuthCard({ authority }: { authority: Authority }) {
         <View style={{ flex: 1, paddingRight: 6 }}>
           <T style={s.cardTitle}>{authority.title}</T>
           <Text style={s.cardCitation}>
-            {normalizeText(authority.citation)}
+            {cleanText(authority.citation)}
           </Text>
         </View>
         <VBadge status={authority.verification_status} />
@@ -597,7 +591,7 @@ function AuthCard({ authority }: { authority: Authority }) {
       <View style={{ ...s.tagRow, marginTop: 3 }}>
         {authority.court_or_source && (
           <Text style={s.tag}>
-            {normalizeText(authority.court_or_source)}
+            {cleanText(authority.court_or_source)}
           </Text>
         )}
         {authority.year && <Text style={s.tag}>{authority.year}</Text>}
@@ -615,7 +609,7 @@ function AuthCard({ authority }: { authority: Authority }) {
           }}
         >
           <Text style={{ ...s.bodySmall, fontFamily: FONT_ITALIC }}>
-            {normalizeText(
+            {cleanText(
               `"${authority.quoted_text}"${authority.pinpoint ? ` at ${authority.pinpoint}` : ""}`
             )}
           </Text>
