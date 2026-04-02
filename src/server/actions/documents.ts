@@ -179,7 +179,25 @@ export async function processDocument(
   });
 
   try {
-    const buffer = await readFile(doc.storagePath);
+    let buffer: Buffer;
+    try {
+      buffer = await readFile(doc.storagePath);
+    } catch {
+      // File not on disk — happens on serverless (Vercel) where filesystem is ephemeral.
+      // Documents are extracted inline during upload, so this path is only for retries.
+      await db.document.update({
+        where: { id: documentId },
+        data: {
+          extractionStatus: "FAILED",
+          extractionError:
+            "Source file is no longer available. Documents are extracted automatically during upload. " +
+            "To re-extract, delete this document and upload it again.",
+        },
+      });
+      revalidatePath(`/matters/${matterId}`);
+      return { error: "Source file not available for re-extraction. Upload the file again." };
+    }
+
     const result = await extractDocument(buffer, doc.mimeType);
 
     if (result.ok) {
