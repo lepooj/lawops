@@ -15,6 +15,8 @@ export function middleware(_request: NextRequest) {
       `style-src 'self' 'unsafe-inline'`,
       `img-src 'self' data: blob:`,
       `font-src 'self' data:`,
+      `worker-src 'self' blob:`,
+      `child-src 'self' blob:`,
       `connect-src 'self' https://*.neon.tech https://*.vercel.app https://*.vercel-insights.com https://api.openai.com`,
       `frame-src 'none'`,
       `object-src 'none'`,
