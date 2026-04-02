@@ -26,9 +26,10 @@ interface LatestRun {
 interface Props {
   matterId: string;
   latestRun: LatestRun | null;
+  matterTitle?: string;
 }
 
-export function AnalysisPageClient({ latestRun }: Props) {
+export function AnalysisPageClient({ latestRun, matterTitle }: Props) {
   // No analysis yet
   if (!latestRun) {
     return (
@@ -149,6 +150,7 @@ export function AnalysisPageClient({ latestRun }: Props) {
         model: latestRun.model,
         latencyMs: latestRun.latencyMs,
         completedAt: latestRun.completedAt?.toISOString() ?? null,
+        matterTitle,
       }}
     />
   );

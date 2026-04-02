@@ -22,6 +22,7 @@ interface AnalysisViewerProps {
     latencyMs: number | null;
     completedAt: string | null;
     hasOcrDocuments?: boolean;
+    matterTitle?: string;
   };
 }
 
@@ -90,7 +91,7 @@ export function AnalysisViewer({
 
         {/* Export buttons */}
         <div className="mt-6 space-y-2">
-          <ExportPdfButton output={output} stats={stats} completedAt={runMeta.completedAt} />
+          <ExportPdfButton output={output} stats={stats} completedAt={runMeta.completedAt} matterTitle={runMeta.matterTitle} />
           <Button
             size="sm"
             variant="secondary"
@@ -377,10 +378,12 @@ function ExportPdfButton({
   output,
   stats,
   completedAt,
+  matterTitle,
 }: {
   output: CopilotOutput;
   stats: OutputStats;
   completedAt: string | null;
+  matterTitle?: string;
 }) {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
@@ -391,7 +394,7 @@ function ExportPdfButton({
 
     try {
       const { generateAnalysisPdf } = await import("./analysis-pdf");
-      const blob = await generateAnalysisPdf(output, stats, completedAt);
+      const blob = await generateAnalysisPdf(output, stats, completedAt, matterTitle);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

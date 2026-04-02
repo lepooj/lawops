@@ -234,17 +234,19 @@ function AnalysisPdfDocument({
   output,
   stats,
   completedAt,
+  matterTitle,
 }: {
   output: CopilotOutput;
   stats: OutputStats;
   completedAt: string | null;
+  matterTitle?: string;
 }) {
   let sectionNum = 0;
   const n = () => ++sectionNum;
 
   return (
     <Document
-      title={cleanText(`Legal Analysis - ${output.matter_summary.task}`)}
+      title={cleanText(`Legal Analysis - ${matterTitle || output.matter_summary.requested_outcome}`)}
       author="LawOps"
       subject={`${output.mode} analysis`}
     >
@@ -265,7 +267,7 @@ function AnalysisPdfDocument({
         {/* Header */}
         <View style={s.headerBlock}>
           <Text style={s.headerTitle}>
-            {cleanText(output.matter_summary.task)}
+            {cleanText(matterTitle || output.matter_summary.requested_outcome)}
           </Text>
           <Text style={s.headerMeta}>
             {cleanText(
@@ -559,13 +561,15 @@ function AuthCard({ authority }: { authority: Authority }) {
 export async function generateAnalysisPdf(
   output: CopilotOutput,
   stats: OutputStats,
-  completedAt: string | null
+  completedAt: string | null,
+  matterTitle?: string
 ): Promise<Blob> {
   return await pdf(
     <AnalysisPdfDocument
       output={output}
       stats={stats}
       completedAt={completedAt}
+      matterTitle={matterTitle}
     />
   ).toBlob();
 }
