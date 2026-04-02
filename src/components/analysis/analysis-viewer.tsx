@@ -398,8 +398,11 @@ function ExportPdfButton({
       a.download = `analysis-${output.mode}-${new Date().toISOString().slice(0, 10)}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setExportError("PDF generation failed");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-console
+      console.error("[LawOps] PDF export failed:", err);
+      setExportError(`PDF generation failed: ${message}`);
     } finally {
       setExporting(false);
     }
