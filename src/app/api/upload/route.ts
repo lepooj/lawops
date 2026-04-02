@@ -1,0 +1,126 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { MAX_FILES_PER_MATTER } from "@/lib/constants";
+import { generateStoragePath, saveFile, deleteFile } from "@/server/lib/file-storage";
+import {
+  validateFileMetadata,
+  detectMimeFromBytes,
+  isMagicByteConsistent,
+  parseDocumentType,
+} from "@/server/lib/upload-validation";
+
+export async function POST(request: NextRequest) {
+  // Auth check
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userId = session.user.id;
+
+  let savedStoragePath: string | null = null;
+
+  try {
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+    const matterId = formData.get("matterId") as string | null;
+    const documentType = (formData.get("documentType") as string) || "OTHER";
+
+    // Validate required fields
+    if (!file || !matterId) {
+      return NextResponse.json(
+        { error: "File and matterId are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate matter ownership
+    const matter = await db.matter.findFirst({
+      where: { id: matterId, userId },
+      select: { id: true, _count: { select: { documents: true } } },
+    });
+
+    if (!matter) {
+      return NextResponse.json({ error: "Matter not found" }, { status: 404 });
+    }
+
+    // Validate file count limit
+    if (matter._count.documents >= MAX_FILES_PER_MATTER) {
+      return NextResponse.json(
+        { error: `Maximum ${MAX_FILES_PER_MATTER} documents per matter` },
+        { status: 400 }
+      );
+    }
+
+    // Validate file metadata (extension, MIME, size, consistency)
+    const validation = validateFileMetadata({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    });
+
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    // Read file bytes
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Magic-byte content check
+    const detectedMime = detectMimeFromBytes(buffer);
+    if (!isMagicByteConsistent(file.type, detectedMime)) {
+      return NextResponse.json(
+        {
+          error: `File content does not match declared type ${file.type}. The file may be corrupted or mislabeled.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Save to disk
+    const { storagePath } = generateStoragePath(matterId, file.name);
+    savedStoragePath = storagePath;
+    await saveFile(storagePath, buffer);
+
+    // Create document record
+    const document = await db.document.create({
+      data: {
+        matterId,
+        userId,
+        originalFilename: file.name,
+        storagePath,
+        mimeType: file.type,
+        fileSize: file.size,
+        documentType: parseDocumentType(documentType),
+        extractionStatus: "PENDING",
+        includeInAnalysis: true,
+      },
+      select: {
+        id: true,
+        originalFilename: true,
+        mimeType: true,
+        fileSize: true,
+        documentType: true,
+        extractionStatus: true,
+        includeInAnalysis: true,
+        uploadedAt: true,
+      },
+    });
+
+    savedStoragePath = null; // DB record created — no cleanup needed
+    return NextResponse.json({ document }, { status: 201 });
+  } catch (e) {
+    // If we saved a file but DB insert failed, clean up the orphaned file
+    if (savedStoragePath) {
+      await deleteFile(savedStoragePath).catch(() => {
+        // Best-effort cleanup — don't mask the original error
+      });
+    }
+
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Upload failed" },
+      { status: 500 }
+    );
+  }
+}

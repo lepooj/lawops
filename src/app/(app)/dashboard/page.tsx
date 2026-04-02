@@ -1,30 +1,21 @@
 import { requireUser } from "@/server/auth-guard";
+import { listMatters } from "@/server/actions/matters";
+import { MatterList } from "./matter-list";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   await requireUser();
+  const params = await searchParams;
 
-  return (
-    <div className="px-8 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-zinc-100">Matters</h1>
-        {/* Create matter button — Phase 2 */}
-        <button
-          disabled
-          className="cursor-not-allowed rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white opacity-50"
-        >
-          + New Matter
-        </button>
-      </div>
+  const filter =
+    params.status === "ACTIVE" || params.status === "DRAFT" || params.status === "ARCHIVED"
+      ? params.status
+      : "ALL";
 
-      {/* Empty state */}
-      <div className="mt-16 flex flex-col items-center justify-center text-center">
-        <div className="rounded-lg border border-zinc-800/60 bg-zinc-900/40 px-8 py-12">
-          <p className="text-sm text-zinc-400">
-            No matters yet. Create your first matter to get started.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  const matters = await listMatters(filter);
+
+  return <MatterList matters={matters} activeFilter={filter} />;
 }

@@ -12,3 +12,54 @@ html {
 body {
   @apply bg-[#0a0a0b] text-zinc-100 antialiased;
 }
+
+/* Shared form input styles */
+.input-base {
+  @apply block w-full rounded-md border border-zinc-700 bg-zinc-800/60 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500;
+}
+
+.textarea-base {
+  @apply block w-full rounded-md border border-zinc-700 bg-zinc-800/60 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y;
+}
+
+/* Print styles — analysis export quality */
+@media print {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background: white;
+    color: #1a1a1a;
+    font-size: 11pt;
+    line-height: 1.5;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide app shell chrome */
+  aside:first-child,
+  nav,
+  header {
+    display: none !important;
+  }
+
+  /* Override dark backgrounds */
+  .bg-\[\\#0a0a0b\],
+  .bg-zinc-900\/40,
+  .bg-zinc-900\/60,
+  .bg-zinc-800\/60 {
+    background: white !important;
+  }
+
+  /* Legal document margins */
+  @page {
+    margin: 1in;
+    size: letter;
+  }
+
+  /* Prevent breaking inside sections */
+  section {
+    break-inside: avoid;
+  }
+}

@@ -5,17 +5,15 @@ export function middleware(_request: NextRequest) {
   const response = NextResponse.next();
 
   // CSP headers
-  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
-
   response.headers.set(
     "Content-Security-Policy",
     [
       `default-src 'self'`,
-      `script-src 'self' 'nonce-${nonce}'`,
-      `style-src 'self' 'unsafe-inline'`, // Tailwind needs unsafe-inline
+      `script-src 'self' 'unsafe-inline' 'unsafe-eval'`,
+      `style-src 'self' 'unsafe-inline'`,
       `img-src 'self' data: blob:`,
-      `font-src 'self'`,
-      `connect-src 'self'`,
+      `font-src 'self' data:`,
+      `connect-src 'self' https://*.neon.tech https://*.vercel.app https://*.vercel-insights.com https://api.openai.com`,
       `frame-src 'none'`,
       `object-src 'none'`,
       `base-uri 'self'`,
