@@ -27,9 +27,10 @@ function cleanText(text: string): string {
 // === Styles ===
 // Using Helvetica family throughout — avoids Times-Roman ligature encoding bugs
 
+// Use only base Helvetica. Bold/italic via fontWeight/fontStyle, NOT separate font names.
+// @react-pdf/renderer's WASM font engine has glyph corruption bugs with
+// named variants (Helvetica-Bold, Helvetica-Oblique) in some browsers.
 const FONT = "Helvetica";
-const FONT_BOLD = "Helvetica-Bold";
-const FONT_ITALIC = "Helvetica-Oblique";
 
 const PAGE_PADDING_TOP = 60;
 const PAGE_PADDING_BOTTOM = 72; // Extra space reserved for footer
@@ -53,7 +54,7 @@ const s = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 16,
-    fontFamily: FONT_BOLD,
+    fontWeight: "bold",
     marginBottom: 6,
     color: "#09090b",
     lineHeight: 1.3,
@@ -77,7 +78,7 @@ const s = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 7.5,
-    fontFamily: FONT_BOLD,
+    fontWeight: "bold",
     color: "#71717a",
     textTransform: "uppercase",
     letterSpacing: 0.8,
@@ -85,7 +86,7 @@ const s = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 12,
-    fontFamily: FONT_BOLD,
+    fontWeight: "bold",
     marginBottom: 8,
     color: "#09090b",
     paddingBottom: 3,
@@ -94,7 +95,7 @@ const s = StyleSheet.create({
   },
   subsectionTitle: {
     fontSize: 9.5,
-    fontFamily: FONT_BOLD,
+    fontWeight: "bold",
     marginTop: 12,
     marginBottom: 5,
     color: "#3f3f46",
@@ -145,7 +146,7 @@ const s = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 9.5,
-    fontFamily: FONT_BOLD,
+    fontWeight: "bold",
     color: "#09090b",
     flex: 1,
     paddingRight: 6,
@@ -169,7 +170,7 @@ const s = StyleSheet.create({
   // Badges
   badge: {
     fontSize: 6.5,
-    fontFamily: FONT_BOLD,
+    fontWeight: "bold",
     paddingHorizontal: 4,
     paddingVertical: 1.5,
     borderRadius: 2,
@@ -221,7 +222,7 @@ const s = StyleSheet.create({
   // Confidence
   confidenceLabel: {
     fontSize: 9.5,
-    fontFamily: FONT_BOLD,
+    fontWeight: "bold",
     color: "#27272a",
   },
   confidenceReason: {
@@ -241,7 +242,7 @@ const s = StyleSheet.create({
     fontSize: 8,
     color: "#71717a",
     lineHeight: 1.4,
-    fontFamily: FONT_ITALIC,
+    fontStyle: "italic",
   },
   // Footer — positioned in reserved bottom padding area
   pageFooter: {
@@ -450,7 +451,7 @@ function AnalysisPdfDocument({
                 style={{
                   ...s.bodySmall,
                   marginTop: 5,
-                  fontFamily: FONT_BOLD,
+                  fontWeight: "bold",
                 }}
               >
                 Depends on:
@@ -608,7 +609,7 @@ function AuthCard({ authority }: { authority: Authority }) {
             borderLeftColor: "#d4d4d8",
           }}
         >
-          <Text style={{ ...s.bodySmall, fontFamily: FONT_ITALIC }}>
+          <Text style={{ ...s.bodySmall, fontStyle: "italic" }}>
             {cleanText(
               `"${authority.quoted_text}"${authority.pinpoint ? ` at ${authority.pinpoint}` : ""}`
             )}
