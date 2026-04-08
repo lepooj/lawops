@@ -70,6 +70,34 @@ enum VerificationStatus {
 
 // === MODELS ===
 
+model LoginAudit {
+  id         String   @id @default(uuid())
+  email      String
+  userId     String?
+  success    Boolean
+  ipAddress  String?
+  userAgent  String?
+  failReason String?
+  createdAt  DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String   // e.g. "matter.create", "analysis.run", "document.upload"
+  entity    String?  // e.g. "matter", "document", "analysis"
+  entityId  String?  // the id of the affected record
+  meta      Json?    // extra context (matter title, filename, etc.)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique

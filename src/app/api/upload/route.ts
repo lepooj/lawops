@@ -10,6 +10,7 @@ import {
   parseDocumentType,
 } from "@/server/lib/upload-validation";
 import { extractDocument } from "@/server/lib/document-extraction/extract-document";
+import { trackActivity } from "@/server/lib/activity-log";
 
 export async function POST(request: NextRequest) {
   // Auth check
@@ -30,10 +31,7 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!file || !matterId) {
-      return NextResponse.json(
-        { error: "File and matterId are required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "File and matterId are required" }, { status: 400 });
     }
 
     // Validate matter ownership
@@ -50,7 +48,7 @@ export async function POST(request: NextRequest) {
     if (matter._count.documents >= MAX_FILES_PER_MATTER) {
       return NextResponse.json(
         { error: `Maximum ${MAX_FILES_PER_MATTER} documents per matter` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -75,7 +73,7 @@ export async function POST(request: NextRequest) {
         {
           error: `File content does not match declared type ${file.type}. The file may be corrupted or mislabeled.`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -136,12 +134,18 @@ export async function POST(request: NextRequest) {
         data: {
           extractionStatus: "FAILED",
           extractionError:
-            extractionErr instanceof Error
-              ? extractionErr.message
-              : "Extraction failed",
+            extractionErr instanceof Error ? extractionErr.message : "Extraction failed",
         },
       });
     }
+
+    trackActivity({
+      userId,
+      action: "document.upload",
+      entity: "document",
+      entityId: document.id,
+      meta: { matterId, filename: file.name, size: file.size, mimeType: file.type },
+    });
 
     // Return the updated document
     const updatedDoc = await db.document.findUnique({
@@ -172,7 +176,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Upload failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

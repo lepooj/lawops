@@ -6,6 +6,7 @@ import { requireUser } from "@/server/auth-guard";
 import { deleteFile, readFile } from "@/server/lib/file-storage";
 import { extractDocument } from "@/server/lib/document-extraction/extract-document";
 import { revalidatePath } from "next/cache";
+import { trackActivity } from "@/server/lib/activity-log";
 
 // === Schemas ===
 
@@ -55,7 +56,7 @@ export async function listDocuments(matterId: string) {
 export async function updateDocumentType(
   documentId: string,
   matterId: string,
-  documentType: string
+  documentType: string,
 ): Promise<{ success: true } | { error: string }> {
   const user = await requireUser();
 
@@ -83,6 +84,14 @@ export async function updateDocumentType(
     data: { documentType: parsed.data },
   });
 
+  trackActivity({
+    userId: user.id,
+    action: "document.update_type",
+    entity: "document",
+    entityId: documentId,
+    meta: { matterId, documentType: parsed.data },
+  });
+
   revalidatePath(`/matters/${matterId}`);
   return { success: true };
 }
@@ -90,7 +99,7 @@ export async function updateDocumentType(
 export async function toggleIncludeInAnalysis(
   documentId: string,
   matterId: string,
-  include: boolean
+  include: boolean,
 ): Promise<{ success: true } | { error: string }> {
   const user = await requireUser();
 
@@ -112,13 +121,21 @@ export async function toggleIncludeInAnalysis(
     data: { includeInAnalysis: include },
   });
 
+  trackActivity({
+    userId: user.id,
+    action: "document.toggle_include",
+    entity: "document",
+    entityId: documentId,
+    meta: { matterId, include },
+  });
+
   revalidatePath(`/matters/${matterId}`);
   return { success: true };
 }
 
 export async function deleteDocument(
   documentId: string,
-  matterId: string
+  matterId: string,
 ): Promise<{ success: true } | { error: string }> {
   const user = await requireUser();
 
@@ -141,6 +158,14 @@ export async function deleteDocument(
   await db.document.delete({ where: { id: documentId } });
   await deleteFile(doc.storagePath);
 
+  trackActivity({
+    userId: user.id,
+    action: "document.delete",
+    entity: "document",
+    entityId: documentId,
+    meta: { matterId },
+  });
+
   revalidatePath(`/matters/${matterId}`);
   return { success: true };
 }
@@ -151,7 +176,7 @@ export async function deleteDocument(
  */
 export async function processDocument(
   documentId: string,
-  matterId: string
+  matterId: string,
 ): Promise<{ success: true } | { error: string }> {
   const user = await requireUser();
 
@@ -230,8 +255,7 @@ export async function processDocument(
       where: { id: documentId },
       data: {
         extractionStatus: "FAILED",
-        extractionError:
-          e instanceof Error ? e.message : "Extraction failed unexpectedly",
+        extractionError: e instanceof Error ? e.message : "Extraction failed unexpectedly",
       },
     });
   }
@@ -245,7 +269,7 @@ export async function processDocument(
  * Runs extraction sequentially to avoid overloading the server.
  */
 export async function processAllPending(
-  matterId: string
+  matterId: string,
 ): Promise<{ processed: number; failed: number } | { error: string }> {
   const user = await requireUser();
 

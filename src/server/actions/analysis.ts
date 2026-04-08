@@ -5,15 +5,13 @@ import { requireUser } from "@/server/auth-guard";
 import { revalidatePath } from "next/cache";
 import { buildAnalysisInput } from "@/server/lib/analysis/build-analysis-input";
 import { callLegalCopilot } from "@/server/lib/analysis/openai-client";
-import {
-  safeParseModelJson,
-  validateCopilotOutput,
-} from "@/lib/ai/output-validator";
+import { safeParseModelJson, validateCopilotOutput } from "@/lib/ai/output-validator";
 import type { AnalysisMode } from "@/lib/ai/modes";
+import { trackActivity } from "@/server/lib/activity-log";
 
 export async function runAnalysis(
   matterId: string,
-  mode: AnalysisMode
+  mode: AnalysisMode,
 ): Promise<{ runId: string } | { error: string }> {
   const user = await requireUser();
 
@@ -88,6 +86,14 @@ export async function runAnalysis(
       promptVersion: "v1",
       model: process.env.OPENAI_MODEL ?? "gpt-4.1",
     },
+  });
+
+  trackActivity({
+    userId: user.id,
+    action: "analysis.start",
+    entity: "analysis",
+    entityId: run.id,
+    meta: { matterId, runNumber, mode },
   });
 
   try {
@@ -181,6 +187,21 @@ export async function runAnalysis(
       });
     }
 
+    trackActivity({
+      userId: user.id,
+      action: "analysis.complete",
+      entity: "analysis",
+      entityId: run.id,
+      meta: {
+        matterId,
+        runNumber,
+        model: callResult.model,
+        inputTokens: callResult.inputTokens,
+        outputTokens: callResult.outputTokens,
+        latencyMs: callResult.latencyMs,
+      },
+    });
+
     revalidatePath(`/matters/${matterId}`);
     return { runId: run.id };
   } catch (e) {
@@ -189,8 +210,7 @@ export async function runAnalysis(
       where: { id: run.id },
       data: {
         status: "FAILED",
-        errorMessage:
-          e instanceof Error ? e.message : "Unexpected error during analysis",
+        errorMessage: e instanceof Error ? e.message : "Unexpected error during analysis",
         completedAt: new Date(),
       },
     });

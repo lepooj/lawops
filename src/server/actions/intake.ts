@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUser } from "@/server/auth-guard";
 import { revalidatePath } from "next/cache";
+import { trackActivity } from "@/server/lib/activity-log";
 
 // === Schemas ===
 
@@ -25,13 +26,7 @@ const authoritySchema = z.object({
 
 const intakeSaveSchema = z.object({
   matterId: z.string().uuid(),
-  section: z.enum([
-    "jurisdiction",
-    "facts",
-    "objective",
-    "history",
-    "authorities",
-  ]),
+  section: z.enum(["jurisdiction", "facts", "objective", "history", "authorities"]),
   data: z.record(z.unknown()),
 });
 
@@ -109,15 +104,13 @@ export async function saveIntakeSection(input: {
   switch (parsed.data.section) {
     case "jurisdiction": {
       const sectionParsed = jurisdictionDataSchema.safeParse(parsed.data.data);
-      if (!sectionParsed.success)
-        return { error: sectionParsed.error.issues[0].message };
+      if (!sectionParsed.success) return { error: sectionParsed.error.issues[0].message };
       updateData = sectionParsed.data;
       break;
     }
     case "facts": {
       const sectionParsed = factsDataSchema.safeParse(parsed.data.data);
-      if (!sectionParsed.success)
-        return { error: sectionParsed.error.issues[0].message };
+      if (!sectionParsed.success) return { error: sectionParsed.error.issues[0].message };
       updateData = {
         facts: sectionParsed.data.facts,
         parties: sectionParsed.data.parties ?? undefined,
@@ -126,15 +119,13 @@ export async function saveIntakeSection(input: {
     }
     case "objective": {
       const sectionParsed = objectiveDataSchema.safeParse(parsed.data.data);
-      if (!sectionParsed.success)
-        return { error: sectionParsed.error.issues[0].message };
+      if (!sectionParsed.success) return { error: sectionParsed.error.issues[0].message };
       updateData = sectionParsed.data;
       break;
     }
     case "history": {
       const sectionParsed = historyDataSchema.safeParse(parsed.data.data);
-      if (!sectionParsed.success)
-        return { error: sectionParsed.error.issues[0].message };
+      if (!sectionParsed.success) return { error: sectionParsed.error.issues[0].message };
       updateData = {
         proceduralStage: sectionParsed.data.proceduralStage,
         priorDecisions: sectionParsed.data.priorDecisions,
@@ -144,14 +135,11 @@ export async function saveIntakeSection(input: {
     }
     case "authorities": {
       const sectionParsed = authoritiesDataSchema.safeParse(parsed.data.data);
-      if (!sectionParsed.success)
-        return { error: sectionParsed.error.issues[0].message };
+      if (!sectionParsed.success) return { error: sectionParsed.error.issues[0].message };
       updateData = {
-        supportingAuthorities:
-          sectionParsed.data.supportingAuthorities ?? undefined,
+        supportingAuthorities: sectionParsed.data.supportingAuthorities ?? undefined,
         opposingArguments: sectionParsed.data.opposingArguments,
-        opposingAuthorities:
-          sectionParsed.data.opposingAuthorities ?? undefined,
+        opposingAuthorities: sectionParsed.data.opposingAuthorities ?? undefined,
       };
       break;
     }
@@ -163,6 +151,14 @@ export async function saveIntakeSection(input: {
     where: { matterId: parsed.data.matterId },
     data: updateData,
     select: { updatedAt: true },
+  });
+
+  trackActivity({
+    userId: user.id,
+    action: "intake.save",
+    entity: "matter",
+    entityId: parsed.data.matterId,
+    meta: { section: parsed.data.section },
   });
 
   revalidatePath(`/matters/${parsed.data.matterId}`);

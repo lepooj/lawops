@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/server/auth-guard";
 import { revalidatePath } from "next/cache";
 import type { MatterStatus, MatterType } from "@prisma/client";
+import { trackActivity } from "@/server/lib/activity-log";
 
 // === Schemas ===
 
@@ -36,6 +37,14 @@ export async function createMatter(input: {
         create: {},
       },
     },
+  });
+
+  trackActivity({
+    userId: user.id,
+    action: "matter.create",
+    entity: "matter",
+    entityId: matter.id,
+    meta: { title: parsed.data.title, type: parsed.data.matterType },
   });
 
   revalidatePath("/dashboard");
@@ -97,7 +106,7 @@ export async function getMatter(matterId: string) {
 }
 
 export async function archiveMatter(
-  matterId: string
+  matterId: string,
 ): Promise<{ success: true } | { error: string }> {
   const user = await requireUser();
 
@@ -122,12 +131,19 @@ export async function archiveMatter(
     },
   });
 
+  trackActivity({
+    userId: user.id,
+    action: "matter.archive",
+    entity: "matter",
+    entityId: matterId,
+  });
+
   revalidatePath("/dashboard");
   return { success: true };
 }
 
 export async function restoreMatter(
-  matterId: string
+  matterId: string,
 ): Promise<{ success: true } | { error: string }> {
   const user = await requireUser();
 
@@ -150,6 +166,13 @@ export async function restoreMatter(
       status: "ACTIVE",
       archivedAt: null,
     },
+  });
+
+  trackActivity({
+    userId: user.id,
+    action: "matter.restore",
+    entity: "matter",
+    entityId: matterId,
   });
 
   revalidatePath("/dashboard");
