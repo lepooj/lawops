@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 type Tab = "all" | "logins" | "activity";
 
 const ACTION_LABELS: Record<string, string> = {
+  // Server-side actions
   "matter.create": "Created matter",
   "matter.archive": "Archived matter",
   "matter.restore": "Restored matter",
@@ -17,6 +18,23 @@ const ACTION_LABELS: Record<string, string> = {
   "document.delete": "Deleted document",
   "document.update_type": "Changed doc type",
   "document.toggle_include": "Toggled doc inclusion",
+  // Client-side interactions
+  "page.view": "Viewed page",
+  "ui.tab_click": "Clicked tab",
+  "ui.filter_change": "Changed filter",
+  "ui.matter_open": "Opened matter",
+  "ui.dialog_open": "Opened dialog",
+  "ui.dialog_close": "Closed dialog",
+  "ui.mode_change": "Changed analysis mode",
+  "ui.run_analysis_click": "Clicked Run Analysis",
+  "ui.toc_click": "Clicked TOC section",
+  "ui.export_pdf_click": "Clicked Export PDF",
+  "ui.print_click": "Clicked Print",
+  "ui.intake_section": "Navigated intake section",
+  "ui.upload_start": "Started file upload",
+  "ui.drag_drop": "Dropped file",
+  "ui.nav_click": "Clicked nav link",
+  "ui.sign_out_click": "Clicked sign out",
 };
 
 function formatAction(action: string): string {
@@ -26,12 +44,18 @@ function formatAction(action: string): string {
 function formatMeta(meta: Record<string, unknown> | null): string {
   if (!meta) return "";
   const parts: string[] = [];
+  if (meta.path) parts.push(`${meta.path}`);
   if (meta.title) parts.push(`"${meta.title}"`);
   if (meta.filename) parts.push(`${meta.filename}`);
+  if (meta.tab) parts.push(`tab: ${meta.tab}`);
   if (meta.section) parts.push(`section: ${meta.section}`);
+  if (meta.filter) parts.push(`filter: ${meta.filter}`);
+  if (meta.target) parts.push(`→ ${meta.target}`);
+  if (meta.dialog) parts.push(`${meta.dialog}`);
   if (meta.mode) parts.push(`mode: ${meta.mode}`);
   if (meta.type) parts.push(`type: ${meta.type}`);
   if (meta.model) parts.push(`model: ${meta.model}`);
+  if (meta.fileCount) parts.push(`${meta.fileCount} file(s)`);
   if (meta.inputTokens || meta.outputTokens)
     parts.push(`${meta.inputTokens ?? 0}→${meta.outputTokens ?? 0} tokens`);
   if (meta.latencyMs) parts.push(`${(Number(meta.latencyMs) / 1000).toFixed(1)}s`);

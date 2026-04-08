@@ -19,6 +19,7 @@ import {
   DOCUMENT_TYPES,
 } from "@/lib/constants";
 import { formatFileSize } from "@/server/lib/upload-validation";
+import { useTrack } from "@/lib/use-track";
 import type { ExtractionStatus, ExtractionMethod, DocumentType } from "@prisma/client";
 
 // === Types ===
@@ -57,6 +58,7 @@ const DOC_TYPE_LABELS: Record<DocumentType, string> = {
 
 export function DocumentList({ matterId, documents }: DocumentListProps) {
   const router = useRouter();
+  const track = useTrack();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -67,11 +69,16 @@ export function DocumentList({ matterId, documents }: DocumentListProps) {
   const atLimit = documents.length >= MAX_FILES_PER_MATTER;
   const acceptExtensions = ALLOWED_EXTENSIONS.join(",");
   const hasPending = documents.some(
-    (d) => d.extractionStatus === "PENDING" || d.extractionStatus === "FAILED"
+    (d) => d.extractionStatus === "PENDING" || d.extractionStatus === "FAILED",
   );
 
   async function handleUpload(files: FileList | null) {
     if (!files || files.length === 0) return;
+    track({
+      action: "ui.upload_start",
+      entity: "document",
+      meta: { matterId, fileCount: files.length },
+    });
 
     setUploadError("");
     setUploading(true);
@@ -80,9 +87,7 @@ export function DocumentList({ matterId, documents }: DocumentListProps) {
 
     for (const file of Array.from(files)) {
       if (file.size > MAX_FILE_SIZE_BYTES) {
-        errors.push(
-          `${file.name}: exceeds ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB limit`
-        );
+        errors.push(`${file.name}: exceeds ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB limit`);
         continue;
       }
 
@@ -164,6 +169,7 @@ export function DocumentList({ matterId, documents }: DocumentListProps) {
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
+    track({ action: "ui.drag_drop", entity: "document", meta: { matterId } });
     if (!atLimit) handleUpload(e.dataTransfer.files);
   }
 
@@ -173,9 +179,7 @@ export function DocumentList({ matterId, documents }: DocumentListProps) {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-zinc-100">
-              Documents
-            </h2>
+            <h2 className="text-base font-semibold text-zinc-100">Documents</h2>
             <p className="mt-1 text-sm text-zinc-500">
               Upload documents and extract text for analysis.
             </p>
@@ -234,16 +238,13 @@ export function DocumentList({ matterId, documents }: DocumentListProps) {
           )}
         </div>
 
-        {uploadError && (
-          <p className="text-sm text-red-400">{uploadError}</p>
-        )}
+        {uploadError && <p className="text-sm text-red-400">{uploadError}</p>}
 
         {/* Document list */}
         {documents.length === 0 ? (
           <div className="rounded-lg border border-zinc-800/60 bg-zinc-900/40 px-6 py-10 text-center">
             <p className="text-sm text-zinc-500">
-              No documents uploaded yet. Upload files to include them in your
-              analysis.
+              No documents uploaded yet. Upload files to include them in your analysis.
             </p>
           </div>
         ) : (
@@ -256,9 +257,7 @@ export function DocumentList({ matterId, documents }: DocumentListProps) {
                 processing={processingId === doc.id}
                 onProcess={() => handleProcess(doc.id)}
                 onDelete={() => handleDelete(doc.id)}
-                onToggleInclude={(include) =>
-                  handleToggleInclude(doc.id, include)
-                }
+                onToggleInclude={(include) => handleToggleInclude(doc.id, include)}
                 onTypeChange={(type) => handleTypeChange(doc.id, type)}
               />
             ))}
@@ -294,8 +293,7 @@ function DocumentCard({
   onToggleInclude: (include: boolean) => void;
   onTypeChange: (type: string) => void;
 }) {
-  const canProcess =
-    doc.extractionStatus === "PENDING" || doc.extractionStatus === "FAILED";
+  const canProcess = doc.extractionStatus === "PENDING" || doc.extractionStatus === "FAILED";
 
   return (
     <div className="rounded-md border border-zinc-800/60 bg-zinc-900/40 p-4">
@@ -304,9 +302,7 @@ function DocumentCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <FileTypeIcon mimeType={doc.mimeType} />
-            <p className="truncate text-sm font-medium text-zinc-200">
-              {doc.originalFilename}
-            </p>
+            <p className="truncate text-sm font-medium text-zinc-200">{doc.originalFilename}</p>
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
@@ -391,9 +387,7 @@ function DocumentCard({
         doc.extractionMethod === "OCR" &&
         !doc.extractedText && (
           <div className="mt-3 rounded border border-amber-900/40 bg-amber-950/20 px-3 py-2">
-            <p className="text-xs text-amber-400">
-              No text detected in this image.
-            </p>
+            <p className="text-xs text-amber-400">No text detected in this image.</p>
           </div>
         )}
     </div>
@@ -431,27 +425,15 @@ function ExtractionStatusBadge({ doc }: { doc: DocumentRow }) {
       if (doc.extractionMethod === "OCR") {
         const confidence = doc.ocrConfidence ?? 0;
         if (confidence >= 0.7) {
-          return (
-            <Badge variant="active">
-              OCR ({Math.round(confidence * 100)}%)
-            </Badge>
-          );
+          return <Badge variant="active">OCR ({Math.round(confidence * 100)}%)</Badge>;
         }
-        return (
-          <Badge variant="draft">
-            OCR — low ({Math.round(confidence * 100)}%)
-          </Badge>
-        );
+        return <Badge variant="draft">OCR — low ({Math.round(confidence * 100)}%)</Badge>;
       }
       return (
-        <Badge variant="active">
-          Extracted{doc.pageCount ? ` (${doc.pageCount} pg)` : ""}
-        </Badge>
+        <Badge variant="active">Extracted{doc.pageCount ? ` (${doc.pageCount} pg)` : ""}</Badge>
       );
     case "FAILED":
-      return (
-        <span className="text-xs text-red-400">Failed</span>
-      );
+      return <span className="text-xs text-red-400">Failed</span>;
   }
 }
 

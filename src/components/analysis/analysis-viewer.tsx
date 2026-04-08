@@ -4,13 +4,9 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type {
-  CopilotOutput,
-  Authority,
-  Issue,
-  GoverningLawEntry,
-} from "@/lib/ai/output-schema";
+import type { CopilotOutput, Authority, Issue, GoverningLawEntry } from "@/lib/ai/output-schema";
 import type { OutputStats, ValidationWarning } from "@/lib/ai/output-validator";
+import { useTrack } from "@/lib/use-track";
 
 interface AnalysisViewerProps {
   output: CopilotOutput;
@@ -26,12 +22,9 @@ interface AnalysisViewerProps {
   };
 }
 
-export function AnalysisViewer({
-  output,
-  stats,
-  warnings,
-  runMeta,
-}: AnalysisViewerProps) {
+export function AnalysisViewer({ output, stats, warnings, runMeta }: AnalysisViewerProps) {
+  const track = useTrack();
+
   return (
     <div className="flex h-full">
       {/* Left TOC — hidden in print */}
@@ -41,6 +34,7 @@ export function AnalysisViewer({
             <a
               key={s.key}
               href={`#section-${s.key}`}
+              onClick={() => track({ action: "ui.toc_click", meta: { section: s.key } })}
               className="block rounded px-2 py-1.5 text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
             >
               {s.label}
@@ -53,23 +47,15 @@ export function AnalysisViewer({
           <p className="font-medium text-zinc-400">Authorities</p>
           <div className="space-y-1">
             {stats.verifiedAuthorities > 0 && (
-              <p className="text-emerald-400">
-                {stats.verifiedAuthorities} verified
-              </p>
+              <p className="text-emerald-400">{stats.verifiedAuthorities} verified</p>
             )}
             {stats.provisionalAuthorities > 0 && (
-              <p className="text-amber-400">
-                {stats.provisionalAuthorities} provisional
-              </p>
+              <p className="text-amber-400">{stats.provisionalAuthorities} provisional</p>
             )}
             {stats.unverifiedAuthorities > 0 && (
-              <p className="text-red-400">
-                {stats.unverifiedAuthorities} unverified
-              </p>
+              <p className="text-red-400">{stats.unverifiedAuthorities} unverified</p>
             )}
-            {stats.totalAuthorities === 0 && (
-              <p className="text-zinc-600">None cited</p>
-            )}
+            {stats.totalAuthorities === 0 && <p className="text-zinc-600">None cited</p>}
           </div>
 
           <div className="mt-3 space-y-1">
@@ -91,12 +77,20 @@ export function AnalysisViewer({
 
         {/* Export buttons */}
         <div className="mt-6 space-y-2">
-          <ExportPdfButton output={output} stats={stats} completedAt={runMeta.completedAt} matterTitle={runMeta.matterTitle} />
+          <ExportPdfButton
+            output={output}
+            stats={stats}
+            completedAt={runMeta.completedAt}
+            matterTitle={runMeta.matterTitle}
+          />
           <Button
             size="sm"
             variant="secondary"
             className="w-full"
-            onClick={() => window.print()}
+            onClick={() => {
+              track({ action: "ui.print_click" });
+              window.print();
+            }}
           >
             Print
           </Button>
@@ -111,14 +105,13 @@ export function AnalysisViewer({
             Legal Analysis — {output.matter_summary.task}
           </h1>
           <p className="mt-1 text-xs text-gray-500">
-            {output.matter_summary.jurisdiction} · {output.matter_summary.forum} · {output.mode} mode
+            {output.matter_summary.jurisdiction} · {output.matter_summary.forum} · {output.mode}{" "}
+            mode
           </p>
           {runMeta.completedAt && (
-            <p className="text-xs text-gray-500">
-              Generated {runMeta.completedAt}
-            </p>
+            <p className="text-xs text-gray-500">Generated {runMeta.completedAt}</p>
           )}
-          <p className="mt-2 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+          <p className="mt-2 text-[10px] font-medium tracking-wider text-gray-400 uppercase">
             AI-Assisted Draft — Verify Before Reliance
           </p>
         </div>
@@ -127,32 +120,32 @@ export function AnalysisViewer({
         <div className="mb-6 flex flex-wrap items-center gap-3 text-xs text-zinc-500 print:hidden">
           <span>Run #{runMeta.runNumber}</span>
           <span className="font-mono">{runMeta.model}</span>
-          {runMeta.latencyMs != null && (
-            <span>{(runMeta.latencyMs / 1000).toFixed(1)}s</span>
-          )}
-          {runMeta.completedAt && (
-            <span>{runMeta.completedAt}</span>
-          )}
+          {runMeta.latencyMs != null && <span>{(runMeta.latencyMs / 1000).toFixed(1)}s</span>}
+          {runMeta.completedAt && <span>{runMeta.completedAt}</span>}
           <Badge variant="active">{output.mode}</Badge>
           <ConfidenceBadge level={output.confidence.overall} />
         </div>
 
         {/* Warnings — only show user-meaningful ones, not technical validator noise */}
-        {warnings.filter(w =>
-          w.code === "NO_AUTHORITIES_CITED" ||
-          w.code === "ALL_AUTHORITIES_UNVERIFIED" ||
-          w.code === "GOVERNING_LAW_ALL_UNVERIFIED"
+        {warnings.filter(
+          (w) =>
+            w.code === "NO_AUTHORITIES_CITED" ||
+            w.code === "ALL_AUTHORITIES_UNVERIFIED" ||
+            w.code === "GOVERNING_LAW_ALL_UNVERIFIED",
         ).length > 0 && (
           <div className="mb-4 rounded border border-amber-900/40 bg-amber-950/20 px-3 py-2 print:border-amber-300 print:bg-amber-50">
-            {warnings.filter(w =>
-              w.code === "NO_AUTHORITIES_CITED" ||
-              w.code === "ALL_AUTHORITIES_UNVERIFIED" ||
-              w.code === "GOVERNING_LAW_ALL_UNVERIFIED"
-            ).map((w, i) => (
-              <p key={i} className="text-xs text-amber-400 print:text-amber-700">
-                {w.message}
-              </p>
-            ))}
+            {warnings
+              .filter(
+                (w) =>
+                  w.code === "NO_AUTHORITIES_CITED" ||
+                  w.code === "ALL_AUTHORITIES_UNVERIFIED" ||
+                  w.code === "GOVERNING_LAW_ALL_UNVERIFIED",
+              )
+              .map((w, i) => (
+                <p key={i} className="text-xs text-amber-400 print:text-amber-700">
+                  {w.message}
+                </p>
+              ))}
           </div>
         )}
 
@@ -160,15 +153,17 @@ export function AnalysisViewer({
         {runMeta.hasOcrDocuments && (
           <div className="mb-4 rounded border border-amber-900/40 bg-amber-950/20 px-3 py-2 print:border-amber-300 print:bg-amber-50">
             <p className="text-xs text-amber-400 print:text-amber-700">
-              This analysis includes OCR-extracted documents which may contain text errors.
-              Verify source document accuracy before reliance.
+              This analysis includes OCR-extracted documents which may contain text errors. Verify
+              source document accuracy before reliance.
             </p>
           </div>
         )}
 
         {/* Matter Summary */}
         <AnalysisSection id="matter-summary" title="Matter Summary">
-          <p className="text-sm text-zinc-300 print:text-gray-800">{output.matter_summary.summary}</p>
+          <p className="text-sm text-zinc-300 print:text-gray-800">
+            {output.matter_summary.summary}
+          </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <MetaTag label="Jurisdiction" value={output.matter_summary.jurisdiction} />
             <MetaTag label="Forum" value={output.matter_summary.forum} />
@@ -267,7 +262,9 @@ export function AnalysisViewer({
         <AnalysisSection id="confidence" title="Confidence Assessment">
           <div className="flex items-center gap-2">
             <ConfidenceBadge level={output.confidence.overall} />
-            <span className="text-sm text-zinc-300 print:text-gray-700">{output.confidence.reason}</span>
+            <span className="text-sm text-zinc-300 print:text-gray-700">
+              {output.confidence.reason}
+            </span>
           </div>
           {output.confidence.depends_on.length > 0 && (
             <div className="mt-2">
@@ -287,12 +284,14 @@ export function AnalysisViewer({
           <div className="rounded border border-zinc-800/60 bg-zinc-900/30 px-4 py-3 print:border-gray-300 print:bg-gray-50">
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2">
-                <span className={cn(
-                  "h-2 w-2 rounded-full",
-                  output.verification.needs_human_legal_review
-                    ? "bg-amber-500"
-                    : "bg-emerald-500"
-                )} />
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    output.verification.needs_human_legal_review
+                      ? "bg-amber-500"
+                      : "bg-emerald-500",
+                  )}
+                />
                 <span className="text-zinc-300 print:text-gray-700">
                   {output.verification.needs_human_legal_review
                     ? "Human legal review required"
@@ -301,9 +300,9 @@ export function AnalysisViewer({
               </div>
               {output.verification.contains_unverified_points && (
                 <p className="text-amber-400 print:text-amber-700">
-                  {output.verification.unverified_point_count} unverified
-                  point{output.verification.unverified_point_count !== 1 ? "s" : ""} —
-                  verify before reliance
+                  {output.verification.unverified_point_count} unverified point
+                  {output.verification.unverified_point_count !== 1 ? "s" : ""} — verify before
+                  reliance
                 </p>
               )}
               {output.verification.notes?.map((note, i) => (
@@ -318,13 +317,17 @@ export function AnalysisViewer({
         {/* Draft Output */}
         {output.draft_output && (
           <AnalysisSection id="draft-output" title={output.draft_output.title || "Draft Output"}>
-            <div className="whitespace-pre-wrap font-serif text-sm leading-relaxed text-zinc-300 print:text-gray-800">
+            <div className="font-serif text-sm leading-relaxed whitespace-pre-wrap text-zinc-300 print:text-gray-800">
               {output.draft_output.body}
             </div>
             {output.draft_output.sections?.map((s, i) => (
               <div key={i} className="mt-4">
-                <h4 className="font-serif text-sm font-semibold text-zinc-200 print:text-gray-900">{s.heading}</h4>
-                <p className="mt-1 whitespace-pre-wrap font-serif text-sm text-zinc-400 print:text-gray-700">{s.content}</p>
+                <h4 className="font-serif text-sm font-semibold text-zinc-200 print:text-gray-900">
+                  {s.heading}
+                </h4>
+                <p className="mt-1 font-serif text-sm whitespace-pre-wrap text-zinc-400 print:text-gray-700">
+                  {s.content}
+                </p>
               </div>
             ))}
           </AnalysisSection>
@@ -337,9 +340,9 @@ export function AnalysisViewer({
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-zinc-800 text-left text-zinc-500 print:border-gray-300 print:text-gray-600">
-                    <th className="pb-2 pr-3">Point</th>
-                    <th className="pb-2 pr-3">Current Matter</th>
-                    <th className="pb-2 pr-3">Authority</th>
+                    <th className="pr-3 pb-2">Point</th>
+                    <th className="pr-3 pb-2">Current Matter</th>
+                    <th className="pr-3 pb-2">Authority</th>
                     <th className="pb-2">Effect</th>
                   </tr>
                 </thead>
@@ -347,9 +350,15 @@ export function AnalysisViewer({
                   {output.comparison_matrix.map((row, i) => (
                     <tr key={i} className="border-b border-zinc-800/40 print:border-gray-200">
                       <td className="py-2 pr-3 text-zinc-300 print:text-gray-800">{row.point}</td>
-                      <td className="py-2 pr-3 text-zinc-400 print:text-gray-600">{row.current_matter}</td>
-                      <td className="py-2 pr-3 text-zinc-400 print:text-gray-600">{row.authority}</td>
-                      <td className="py-2"><EffectBadge effect={row.effect} /></td>
+                      <td className="py-2 pr-3 text-zinc-400 print:text-gray-600">
+                        {row.current_matter}
+                      </td>
+                      <td className="py-2 pr-3 text-zinc-400 print:text-gray-600">
+                        {row.authority}
+                      </td>
+                      <td className="py-2">
+                        <EffectBadge effect={row.effect} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -360,11 +369,10 @@ export function AnalysisViewer({
 
         {/* Disclaimer footer */}
         <div className="mt-8 border-t border-zinc-800/60 pt-4 print:border-gray-300">
-          <p className="text-xs text-zinc-500 print:text-gray-500">
-            {output.disclaimer}
-          </p>
+          <p className="text-xs text-zinc-500 print:text-gray-500">{output.disclaimer}</p>
           <p className="mt-1 text-[10px] text-zinc-600 print:text-gray-400">
-            AI-generated analysis. All authorities and legal propositions require independent verification before reliance.
+            AI-generated analysis. All authorities and legal propositions require independent
+            verification before reliance.
           </p>
         </div>
       </div>
@@ -387,8 +395,10 @@ function ExportPdfButton({
 }) {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const trackPdf = useTrack();
 
   async function handleExport() {
+    trackPdf({ action: "ui.export_pdf_click" });
     setExporting(true);
     setExportError("");
 
@@ -421,9 +431,7 @@ function ExportPdfButton({
       >
         {exporting ? "Generating…" : "Export PDF"}
       </Button>
-      {exportError && (
-        <p className="text-xs text-red-400">{exportError}</p>
-      )}
+      {exportError && <p className="text-xs text-red-400">{exportError}</p>}
     </>
   );
 }
@@ -447,10 +455,20 @@ const SECTION_ORDER = [
 
 // === Sub-components ===
 
-function AnalysisSection({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+function AnalysisSection({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <section id={`section-${id}`} className="mb-8 print:mb-6 print:break-inside-avoid">
-      <h3 className="mb-3 text-sm font-semibold text-zinc-100 print:text-base print:font-bold print:text-gray-900">{title}</h3>
+      <h3 className="mb-3 text-sm font-semibold text-zinc-100 print:text-base print:font-bold print:text-gray-900">
+        {title}
+      </h3>
       {children}
     </section>
   );
@@ -491,7 +509,15 @@ function IssueRow({ issue }: { issue: Issue }) {
         <p className="text-sm text-zinc-200 print:text-gray-800">{issue.issue}</p>
       </div>
       <div className="flex shrink-0 gap-2">
-        <Badge variant={issue.importance === "high" ? "active" : issue.importance === "medium" ? "draft" : "default"}>
+        <Badge
+          variant={
+            issue.importance === "high"
+              ? "active"
+              : issue.importance === "medium"
+                ? "draft"
+                : "default"
+          }
+        >
           {issue.importance}
         </Badge>
         <Badge variant="default">{issue.status.replace("_", " ")}</Badge>
@@ -502,14 +528,16 @@ function IssueRow({ issue }: { issue: Issue }) {
 
 function GoverningLawRow({ entry }: { entry: GoverningLawEntry }) {
   return (
-    <div className={cn(
-      "rounded border px-3 py-2 print:border-gray-200",
-      entry.verification_status === "verified"
-        ? "border-emerald-900/30 bg-emerald-950/10"
-        : entry.verification_status === "provisional"
-          ? "border-amber-900/30 bg-amber-950/10"
-          : "border-red-900/30 bg-red-950/10"
-    )}>
+    <div
+      className={cn(
+        "rounded border px-3 py-2 print:border-gray-200",
+        entry.verification_status === "verified"
+          ? "border-emerald-900/30 bg-emerald-950/10"
+          : entry.verification_status === "provisional"
+            ? "border-amber-900/30 bg-amber-950/10"
+            : "border-red-900/30 bg-red-950/10",
+      )}
+    >
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-medium text-zinc-300 print:text-gray-800">{entry.topic}</p>
         <VerificationBadge status={entry.verification_status} />
@@ -522,19 +550,23 @@ function GoverningLawRow({ entry }: { entry: GoverningLawEntry }) {
 
 function AuthorityCard({ authority }: { authority: Authority }) {
   return (
-    <div className={cn(
-      "rounded border px-4 py-3 print:border-gray-200",
-      authority.verification_status === "verified"
-        ? "border-emerald-900/30 bg-emerald-950/10"
-        : authority.verification_status === "provisional"
-          ? "border-amber-900/30 bg-amber-950/10"
-          : "border-red-900/30 bg-red-950/10"
-    )}>
+    <div
+      className={cn(
+        "rounded border px-4 py-3 print:border-gray-200",
+        authority.verification_status === "verified"
+          ? "border-emerald-900/30 bg-emerald-950/10"
+          : authority.verification_status === "provisional"
+            ? "border-amber-900/30 bg-amber-950/10"
+            : "border-red-900/30 bg-red-950/10",
+      )}
+    >
       {/* Title row */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-medium text-zinc-200 print:text-gray-900">{authority.title}</p>
-          <p className="font-mono text-xs text-zinc-400 print:text-gray-600">{authority.citation}</p>
+          <p className="font-mono text-xs text-zinc-400 print:text-gray-600">
+            {authority.citation}
+          </p>
         </div>
         <div className="flex shrink-0 gap-1.5">
           <VerificationBadge status={authority.verification_status} />
@@ -543,9 +575,7 @@ function AuthorityCard({ authority }: { authority: Authority }) {
 
       {/* Metadata row */}
       <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-        {authority.court_or_source && (
-          <MetaTag label="Court" value={authority.court_or_source} />
-        )}
+        {authority.court_or_source && <MetaTag label="Court" value={authority.court_or_source} />}
         {authority.year && <MetaTag label="Year" value={String(authority.year)} />}
         <MetaTag label="Weight" value={authority.weight} />
         <TreatmentTag treatment={authority.treatment} />
@@ -556,10 +586,10 @@ function AuthorityCard({ authority }: { authority: Authority }) {
 
       {/* Quoted text */}
       {authority.quoted_text && (
-        <blockquote className="mt-2 border-l-2 border-zinc-700 pl-3 font-serif text-xs italic text-zinc-500 print:border-gray-300 print:text-gray-500">
+        <blockquote className="mt-2 border-l-2 border-zinc-700 pl-3 font-serif text-xs text-zinc-500 italic print:border-gray-300 print:text-gray-500">
           &ldquo;{authority.quoted_text}&rdquo;
           {authority.pinpoint && (
-            <span className="ml-1 not-italic text-zinc-600">at {authority.pinpoint}</span>
+            <span className="ml-1 text-zinc-600 not-italic">at {authority.pinpoint}</span>
           )}
         </blockquote>
       )}
@@ -576,7 +606,12 @@ function TreatmentTag({ treatment }: { treatment: string }) {
   };
 
   return (
-    <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", colors[treatment] ?? colors.background_only)}>
+    <span
+      className={cn(
+        "rounded px-1.5 py-0.5 text-[10px] font-medium",
+        colors[treatment] ?? colors.background_only,
+      )}
+    >
       {treatment.replace("_", " ")}
     </span>
   );
@@ -584,9 +619,21 @@ function TreatmentTag({ treatment }: { treatment: string }) {
 
 function VerificationBadge({ status }: { status: "verified" | "provisional" | "unverified" }) {
   const config = {
-    verified: { bg: "bg-emerald-950/60 print:bg-emerald-100", text: "text-emerald-400 print:text-emerald-700", label: "verified" },
-    provisional: { bg: "bg-amber-950/60 print:bg-amber-100", text: "text-amber-400 print:text-amber-700", label: "provisional" },
-    unverified: { bg: "bg-red-950/60 print:bg-red-100", text: "text-red-400 print:text-red-700", label: "unverified" },
+    verified: {
+      bg: "bg-emerald-950/60 print:bg-emerald-100",
+      text: "text-emerald-400 print:text-emerald-700",
+      label: "verified",
+    },
+    provisional: {
+      bg: "bg-amber-950/60 print:bg-amber-100",
+      text: "text-amber-400 print:text-amber-700",
+      label: "provisional",
+    },
+    unverified: {
+      bg: "bg-red-950/60 print:bg-red-100",
+      text: "text-red-400 print:text-red-700",
+      label: "unverified",
+    },
   };
   const c = config[status];
 
@@ -599,11 +646,13 @@ function VerificationBadge({ status }: { status: "verified" | "provisional" | "u
 
 function ConfidenceBadge({ level }: { level: "high" | "moderate" | "low" }) {
   return (
-    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", {
-      "bg-emerald-950/60 text-emerald-400": level === "high",
-      "bg-amber-950/60 text-amber-400": level === "moderate",
-      "bg-red-950/60 text-red-400": level === "low",
-    })}>
+    <span
+      className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", {
+        "bg-emerald-950/60 text-emerald-400": level === "high",
+        "bg-amber-950/60 text-amber-400": level === "moderate",
+        "bg-red-950/60 text-red-400": level === "low",
+      })}
+    >
       {level}
     </span>
   );
@@ -611,12 +660,14 @@ function ConfidenceBadge({ level }: { level: "high" | "moderate" | "low" }) {
 
 function EffectBadge({ effect }: { effect: "helps" | "hurts" | "mixed" | "unclear" }) {
   return (
-    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", {
-      "bg-emerald-950/60 text-emerald-400": effect === "helps",
-      "bg-red-950/60 text-red-400": effect === "hurts",
-      "bg-amber-950/60 text-amber-400": effect === "mixed",
-      "bg-zinc-800 text-zinc-500": effect === "unclear",
-    })}>
+    <span
+      className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", {
+        "bg-emerald-950/60 text-emerald-400": effect === "helps",
+        "bg-red-950/60 text-red-400": effect === "hurts",
+        "bg-amber-950/60 text-amber-400": effect === "mixed",
+        "bg-zinc-800 text-zinc-500": effect === "unclear",
+      })}
+    >
       {effect}
     </span>
   );

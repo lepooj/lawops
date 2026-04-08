@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useTrack } from "@/lib/use-track";
 import { saveIntakeSection } from "@/server/actions/intake";
 import {
   INTAKE_SECTION_DEFS,
@@ -26,8 +27,8 @@ interface IntakeFormProps {
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 export function IntakeForm({ matterId, initialData }: IntakeFormProps) {
-  const [activeSection, setActiveSection] =
-    useState<IntakeSectionKey>("jurisdiction");
+  const track = useTrack();
+  const [activeSection, setActiveSection] = useState<IntakeSectionKey>("jurisdiction");
   const [formData, setFormData] = useState<IntakeFormData>(initialData);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
@@ -80,7 +81,7 @@ export function IntakeForm({ matterId, initialData }: IntakeFormProps) {
         executeSave(pending.section, pending.data);
       }
     },
-    [matterId]
+    [matterId],
   );
 
   const scheduleSave = useCallback(
@@ -97,13 +98,10 @@ export function IntakeForm({ matterId, initialData }: IntakeFormProps) {
         }
       }, 800);
     },
-    [executeSave]
+    [executeSave],
   );
 
-  function updateSection(
-    section: IntakeSectionKey,
-    updates: Partial<IntakeFormData>
-  ) {
+  function updateSection(section: IntakeSectionKey, updates: Partial<IntakeFormData>) {
     setFormData((prev) => {
       const next = { ...prev, ...updates };
       const sectionData = extractSectionData(section, next);
@@ -113,12 +111,16 @@ export function IntakeForm({ matterId, initialData }: IntakeFormProps) {
   }
 
   function goToSection(key: IntakeSectionKey) {
+    track({
+      action: "ui.intake_section",
+      entity: "matter",
+      entityId: matterId,
+      meta: { section: key },
+    });
     setActiveSection(key);
   }
 
-  const currentIndex = INTAKE_SECTION_DEFS.findIndex(
-    (s) => s.key === activeSection
-  );
+  const currentIndex = INTAKE_SECTION_DEFS.findIndex((s) => s.key === activeSection);
 
   function goNext() {
     if (currentIndex < INTAKE_SECTION_DEFS.length - 1) {
@@ -149,26 +151,23 @@ export function IntakeForm({ matterId, initialData }: IntakeFormProps) {
                   "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
                   isActive
                     ? "bg-zinc-800/80 text-zinc-100"
-                    : "text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-300"
+                    : "text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-300",
                 )}
               >
                 <span
                   className={cn(
                     "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-medium",
                     {
-                      "bg-emerald-500/20 text-emerald-400":
-                        hasData && !isActive,
+                      "bg-emerald-500/20 text-emerald-400": hasData && !isActive,
                       "bg-indigo-500/20 text-indigo-400": isActive,
                       "bg-zinc-800 text-zinc-500": !hasData && !isActive,
-                    }
+                    },
                   )}
                 >
                   {hasData ? "✓" : section.order}
                 </span>
                 <span className="truncate">{section.title}</span>
-                {section.required && (
-                  <span className="ml-auto text-[10px] text-zinc-600">req</span>
-                )}
+                {section.required && <span className="ml-auto text-[10px] text-zinc-600">req</span>}
               </button>
             );
           })}
@@ -201,10 +200,7 @@ export function IntakeForm({ matterId, initialData }: IntakeFormProps) {
             />
           )}
           {activeSection === "facts" && (
-            <FactsSection
-              data={formData}
-              onChange={(updates) => updateSection("facts", updates)}
-            />
+            <FactsSection data={formData} onChange={(updates) => updateSection("facts", updates)} />
           )}
           {activeSection === "objective" && (
             <ObjectiveSection
@@ -224,9 +220,7 @@ export function IntakeForm({ matterId, initialData }: IntakeFormProps) {
               onChange={(updates) => updateSection("authorities", updates)}
             />
           )}
-          {activeSection === "documents" && (
-            <DocumentsSection matterId={matterId} />
-          )}
+          {activeSection === "documents" && <DocumentsSection matterId={matterId} />}
         </div>
 
         {/* Bottom bar */}
@@ -234,9 +228,7 @@ export function IntakeForm({ matterId, initialData }: IntakeFormProps) {
           <div className="text-xs text-zinc-500">
             {saveState === "saving" && "Saving\u2026"}
             {saveState === "saved" && "Saved"}
-            {saveState === "error" && (
-              <span className="text-red-400">Save failed</span>
-            )}
+            {saveState === "error" && <span className="text-red-400">Save failed</span>}
           </div>
 
           <div className="flex gap-2">
