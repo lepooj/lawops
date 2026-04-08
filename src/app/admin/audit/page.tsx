@@ -107,7 +107,8 @@ export default async function AuditPage({
     label: string;
     detail: string;
     badge: { text: string; color: string } | null;
-    secondary: string;
+    ip: string | null;
+    userAgent: string | null;
   };
 
   const timeline: TimelineEntry[] = [];
@@ -118,11 +119,10 @@ export default async function AuditPage({
       type: "login",
       time: l.createdAt,
       label: l.success ? "Login" : "Login failed",
-      detail: l.email,
-      badge: l.success
-        ? { text: "OK", color: "green" }
-        : { text: l.failReason ?? "FAIL", color: "red" },
-      secondary: [l.ipAddress, l.userAgent?.slice(0, 80)].filter(Boolean).join(" · "),
+      detail: l.email + (l.failReason ? ` (${l.failReason})` : ""),
+      badge: l.success ? { text: "OK", color: "green" } : { text: "FAIL", color: "red" },
+      ip: l.ipAddress,
+      userAgent: l.userAgent,
     });
   }
 
@@ -140,7 +140,8 @@ export default async function AuditPage({
             color: a.entity === "analysis" ? "purple" : a.entity === "document" ? "blue" : "zinc",
           }
         : null,
-      secondary: a.entityId ? `ID: ${a.entityId.slice(0, 8)}…` : "",
+      ip: a.ipAddress,
+      userAgent: a.userAgent,
     });
   }
 
@@ -206,10 +207,11 @@ export default async function AuditPage({
           <table className="w-full text-left text-sm">
             <thead className="bg-zinc-800/50 text-xs text-zinc-400 uppercase">
               <tr>
-                <th className="w-[180px] px-4 py-3">Time</th>
-                <th className="w-[90px] px-4 py-3">Type</th>
+                <th className="w-[160px] px-4 py-3">Time</th>
+                <th className="w-[80px] px-4 py-3">Type</th>
                 <th className="px-4 py-3">Event</th>
                 <th className="px-4 py-3">Details</th>
+                <th className="w-[130px] px-4 py-3">IP</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
@@ -248,20 +250,15 @@ export default async function AuditPage({
                   <td className="px-4 py-3 text-zinc-200">{entry.label}</td>
                   <td className="px-4 py-3">
                     <div className="text-sm text-zinc-300">{entry.detail}</div>
-                    {entry.secondary && (
-                      <div
-                        className="mt-0.5 max-w-[350px] truncate text-xs text-zinc-500"
-                        title={entry.secondary}
-                      >
-                        {entry.secondary}
-                      </div>
-                    )}
+                  </td>
+                  <td className="px-4 py-3" title={entry.userAgent ?? undefined}>
+                    <span className="font-mono text-xs text-zinc-400">{entry.ip ?? "—"}</span>
                   </td>
                 </tr>
               ))}
               {displayEntries.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
                     No entries yet.
                   </td>
                 </tr>

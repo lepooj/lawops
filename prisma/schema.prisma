@@ -91,11 +91,14 @@ model ActivityLog {
   entity    String?  // e.g. "matter", "document", "analysis"
   entityId  String?  // the id of the affected record
   meta      Json?    // extra context (matter title, filename, etc.)
+  ipAddress String?
+  userAgent String?
   createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+  @@index([ipAddress])
 }
 
 model User {

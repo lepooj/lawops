@@ -14,6 +14,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true }); // silent drop if unauthed
   }
 
+  const ipAddress =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip") ??
+    null;
+  const userAgent = request.headers.get("user-agent") ?? null;
+
   try {
     const body = await request.json();
     const events: {
@@ -33,6 +39,8 @@ export async function POST(request: NextRequest) {
         entity: e.entity ?? null,
         entityId: e.entityId ?? null,
         meta: (e.meta as Prisma.InputJsonValue) ?? undefined,
+        ipAddress,
+        userAgent,
       })),
     });
   } catch (err) {
